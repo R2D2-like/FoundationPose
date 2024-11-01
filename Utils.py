@@ -168,6 +168,7 @@ def nvdiffrast_render(K=None, H=None, W=None, ob_in_cams=None, glctx=None, conte
   pts_cam = transform_pts(pos, ob_in_cams)
   pos_homo = to_homo_torch(pos)
   pos_clip = (mtx[:,None]@pos_homo[None,...,None])[...,0]
+  pos_clip = pos_clip.to(torch.float32)
   if bbox2d is not None:
     l = bbox2d[:,0]
     t = H-bbox2d[:,1]
@@ -179,6 +180,8 @@ def nvdiffrast_render(K=None, H=None, W=None, ob_in_cams=None, glctx=None, conte
     tf[:,3,0] = (W-r-l)/(r-l)
     tf[:,3,1] = (H-t-b)/(t-b)
     pos_clip = pos_clip@tf
+    pos_clip = pos_clip.to(torch.float32)
+  
   rast_out, _ = dr.rasterize(glctx, pos_clip, pos_idx, resolution=np.asarray(output_size))
   xyz_map, _ = dr.interpolate(pts_cam, rast_out, pos_idx)
   depth = xyz_map[...,2]
@@ -192,6 +195,7 @@ def nvdiffrast_render(K=None, H=None, W=None, ob_in_cams=None, glctx=None, conte
     get_normal = True
   if get_normal:
     vnormals_cam = transform_dirs(vnormals, ob_in_cams)
+    vnormals_cam = vnormals_cam.to(torch.float32)
     normal_map, _ = dr.interpolate(vnormals_cam, rast_out, pos_idx)
     normal_map = F.normalize(normal_map, dim=-1)
     normal_map = torch.flip(normal_map, dims=[1])
@@ -594,7 +598,7 @@ def compute_crop_window_tf_batch(pts=None, H=None, W=None, poses=None, K=None, c
     new_tf = torch.eye(3)[None].expand(B,-1,-1).contiguous()
     new_tf[:,0,0] = out_size[0]/(right-left)
     new_tf[:,1,1] = out_size[1]/(bottom-top)
-    tf = new_tf@tf
+    tf = (new_tf @ tf).to(torch.float32)
     return tf
 
   B = len(poses)
